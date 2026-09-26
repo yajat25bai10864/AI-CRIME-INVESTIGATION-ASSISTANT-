@@ -1,0 +1,131 @@
+export interface TimelineEvent {
+  id: string;
+  time: string;
+  date: string;
+  title: string;
+  description: string;
+  type: 'INCIDENT' | 'FIR' | 'CCTV' | 'WITNESS' | 'EVIDENCE' | 'ACTION' | 'ARREST';
+  evidenceIds?: string[];
+  officer?: string;
+}
+
+export const TIMELINE_EVENTS: TimelineEvent[] = [
+  {
+    id: 'T-001',
+    time: '20:30',
+    date: '2026-09-08',
+    title: 'Suspects Observed — MP Nagar Chowk',
+    description: 'CCTV at MP Nagar Chowk captures two individuals on black motorcycle MP04AB1234 moving towards Central Market.',
+    type: 'CCTV',
+    evidenceIds: ['EV-1024'],
+    officer: 'R. Deshmukh',
+  },
+  {
+    id: 'T-002',
+    time: '20:45',
+    date: '2026-09-08',
+    title: 'Robbery Incident — Central Market',
+    description: 'Armed robbery takes place at Central Market, MP Nagar. Victim Suresh Kumar Gupta robbed of ₹24,500 and gold chain. Minor injuries sustained.',
+    type: 'INCIDENT',
+    evidenceIds: ['EV-1025'],
+    officer: undefined,
+  },
+  {
+    id: 'T-003',
+    time: '20:47',
+    date: '2026-09-08',
+    title: 'Witness Observes Escape',
+    description: 'Witness Rajesh Kumar sees suspects flee on motorcycle heading towards Kolar Road direction.',
+    type: 'WITNESS',
+    evidenceIds: ['EV-1026'],
+    officer: undefined,
+  },
+  {
+    id: 'T-004',
+    time: '20:52',
+    date: '2026-09-08',
+    title: 'PCR Call — Control Room Notified',
+    description: 'Emergency call received at MP Nagar Police Station. PCR deployed to scene.',
+    type: 'ACTION',
+    officer: 'PCR Team',
+  },
+  {
+    id: 'T-005',
+    time: '21:05',
+    date: '2026-09-08',
+    title: 'Police Reaches Scene',
+    description: 'Officers R. Deshmukh and P. Sharma reach Central Market. First responder assessment. Scene secured.',
+    type: 'ACTION',
+    officer: 'R. Deshmukh',
+  },
+  {
+    id: 'T-006',
+    time: '21:15',
+    date: '2026-09-08',
+    title: 'Motorcycle Passes NH-12 Toll',
+    description: 'Vehicle MP04AB1234 recorded at NH-12 Toll Plaza, heading out of city.',
+    type: 'EVIDENCE',
+    evidenceIds: ['EV-1029'],
+    officer: 'D. Rao',
+  },
+  {
+    id: 'T-007',
+    time: '22:10',
+    date: '2026-09-08',
+    title: 'FIR Registered — FIR-2026-1042',
+    description: 'Victim Suresh Kumar Gupta files FIR at MP Nagar Police Station. IPC 392, 394, 34 registered.',
+    type: 'FIR',
+    evidenceIds: ['EV-1027'],
+    officer: 'R. Deshmukh',
+  },
+  {
+    id: 'T-008',
+    time: '23:00',
+    date: '2026-09-08',
+    title: 'Scene Documentation',
+    description: 'Forensic team photographs crime scene. Evidence collection initiated.',
+    type: 'EVIDENCE',
+    evidenceIds: ['EV-1028'],
+    officer: 'Forensics Team',
+  },
+  {
+    id: 'T-009',
+    time: '11:30',
+    date: '2026-09-09',
+    title: 'Witness Statement Recorded — Rajesh Kumar',
+    description: 'Audio statement recorded from eyewitness Rajesh Kumar at MP Nagar PS.',
+    type: 'WITNESS',
+    evidenceIds: ['EV-1026'],
+    officer: 'A. Singh',
+  },
+  {
+    id: 'T-010',
+    time: '14:00',
+    date: '2026-09-10',
+    title: 'CDR Obtained — Suspect Phone',
+    description: 'Call detail records obtained for number linked to Arun Chauhan with magistrate order. Analysis initiated.',
+    type: 'EVIDENCE',
+    evidenceIds: ['EV-1031'],
+    officer: 'R. Deshmukh',
+  },
+  {
+    id: 'T-011',
+    time: '09:00',
+    date: '2026-09-11',
+    title: 'CCTV Face Enhancement Commissioned',
+    description: 'Enhanced facial imaging commissioned from CFSL. Suspect A face from EV-1025 submitted.',
+    type: 'ACTION',
+    evidenceIds: ['EV-1025'],
+    officer: 'P. Sharma',
+  },
+  {
+    id: 'T-012',
+    time: '15:30',
+    date: '2026-09-12',
+    title: 'Arun Chauhan Identified as Vehicle Owner',
+    description: 'Registration database confirms MP04AB1234 registered to Arun Chauhan, Bairagarh. Summoned for questioning.',
+    type: 'ACTION',
+    evidenceIds: ['EV-1029', 'EV-1031'],
+    officer: 'R. Deshmukh',
+  },
+];

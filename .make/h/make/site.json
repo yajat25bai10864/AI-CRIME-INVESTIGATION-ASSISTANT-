@@ -1,0 +1,10 @@
+{
+  "description": "A professional case management tool for police investigations offering evidence tracking, suspect analysis, interactive timelines, and detailed reporting.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

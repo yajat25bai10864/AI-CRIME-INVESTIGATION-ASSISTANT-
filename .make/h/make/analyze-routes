@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo "Checking React application routes..."
+
+find src -type f \( -name "*.tsx" -o -name "*.jsx" \) \
+  -print
+
+echo "Route check completed."
