@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { ArrowLeft, Archive, Users, Clock, FileText, BarChart2, FileOutput } from 'lucide-react';
-import { CASES } from '../data/cases';
+import { CASES, type Case } from '../data/cases';
+import { getFIRById } from '../services/api';
 import { EVIDENCE_LIST } from '../data/evidence';
 import { PERSONS } from '../data/suspects';
 import { TIMELINE_EVENTS } from '../data/timeline';
@@ -64,8 +65,61 @@ const AI_INSIGHTS = [
 export default function CaseDetail() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
+  const [c, setCase] = useState<Case | undefined>(
+    CASES.find((x) => x.id === id)
+  );
+  const [loading, setLoading] = useState(true);
 
-  const c = CASES.find((x) => x.id === id);
+  useEffect(() => {
+    if (!id) return;
+
+    const loadCase = async () => {
+      try {
+        const fir = await getFIRById(id);
+
+        const mappedCase: Case = {
+          id: fir.case_id,
+          crimeType: fir.crime_type,
+          location: fir.location.address ?? 'Unknown',
+          date: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleDateString('en-GB')
+            : 'Unknown',
+          time: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Unknown',
+          priority: 'MEDIUM',
+          status: 'ACTIVE',
+          officer: 'AI Investigation System',
+          ipcSections: fir.ipc_sections,
+          summary: fir.raw_text,
+          victim: fir.victim_details[0]?.name ?? 'Unknown',
+          fir: fir.case_id,
+          evidenceCount: 0,
+          suspectsCount: fir.suspect_details.length,
+        };
+
+        setCase(mappedCase);
+      } catch (error) {
+        console.error('Failed to load case:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCase();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center text-[12px] text-[#475569]">
+        Loading case...
+      </div>
+    );
+  }
+
   if (!c) {
     return (
       <div className="p-8 text-center">

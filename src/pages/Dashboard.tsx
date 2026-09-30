@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -10,6 +11,7 @@ import {
 import {
   CASES, CASE_STATS, WEEKLY_ACTIVITY, CASES_BY_STATUS, EVIDENCE_BREAKDOWN
 } from '../data/cases';
+import { listFIRs } from '../services/api';
 
 const PRIORITY_COLOR: Record<string, string> = {
   HIGH: 'text-[#ef4444] bg-[#ef444420] border-[#ef444440]',
@@ -33,6 +35,38 @@ const FEED = [
 ];
 
 export default function Dashboard() {
+  const [recentCases, setRecentCases] = useState(CASES.slice(0, 5));
+
+  useEffect(() => {
+    const loadRecentCases = async () => {
+      try {
+        const firs = await listFIRs();
+
+        const mapped = firs.slice(0, 5).map((fir) => ({
+          id: fir.case_id,
+          crimeType: fir.crime_type,
+          location: fir.location.address ?? 'Unknown',
+          date: fir.incident_date ?? '',
+          time: '',
+          priority: 'MEDIUM' as const,
+          status: 'ACTIVE' as const,
+          officer: 'AI Investigation System',
+          ipcSections: fir.ipc_sections,
+          summary: fir.raw_text,
+          victim: fir.victim_details[0]?.name ?? 'Unknown',
+          fir: fir.case_id,
+          evidenceCount: 0,
+          suspectsCount: fir.suspect_details.length,
+        }));
+
+        setRecentCases(mapped);
+      } catch (error) {
+        console.error('Failed to load recent cases:', error);
+      }
+    };
+
+    loadRecentCases();
+  }, []);
   return (
     <div className="p-5 space-y-5">
       {/* Header */}
@@ -135,7 +169,7 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="space-y-2">
-            {CASES.slice(0, 5).map((c) => (
+            {recentCases.map((c) => (
               <Link
                 key={c.id}
                 to={`/cases/${c.id}`}

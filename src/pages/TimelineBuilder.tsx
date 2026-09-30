@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TIMELINE_EVENTS, TimelineEvent } from '../data/timeline';
 import { Download } from 'lucide-react';
+import { listFIRs } from '../services/api';
 
 const TYPE_META: Record<string, { color: string; label: string }> = {
   INCIDENT: { color: '#ef4444', label: 'Incident' },
@@ -18,8 +19,42 @@ type Filter = typeof FILTERS[number];
 export default function TimelineBuilder() {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>(TIMELINE_EVENTS);
 
-  const filtered = TIMELINE_EVENTS.filter((ev) => filter === 'ALL' || ev.type === filter);
+  useEffect(() => {
+    const loadTimeline = async () => {
+      try {
+        const firs = await listFIRs();
+
+        const firEvents: TimelineEvent[] = firs
+          .filter((fir) => fir.incident_date)
+          .map((fir) => {
+            const date = new Date(fir.incident_date!);
+
+            return {
+              id: `FIR-${fir.case_id}`,
+              time: date.toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              date: date.toISOString().slice(0, 10),
+              title: `${fir.crime_type.toUpperCase()} — ${fir.location.address ?? 'Unknown location'}`,
+              description: fir.raw_text,
+              type: 'INCIDENT',
+              officer: 'AI Investigation System',
+            };
+          });
+
+        setTimelineEvents([...firEvents, ...TIMELINE_EVENTS]);
+      } catch (error) {
+        console.error('Failed to load timeline:', error);
+      }
+    };
+
+    loadTimeline();
+  }, []);
+
+  const filtered = timelineEvents.filter((ev) => filter === 'ALL' || ev.type === filter);
 
   // Group by date
   const byDate: Record<string, TimelineEvent[]> = {};
@@ -33,7 +68,7 @@ export default function TimelineBuilder() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-white">Forensic Timeline</h1>
-          <p className="text-[12px] text-[#475569] font-mono mt-0.5">CR-2026-0142 · {TIMELINE_EVENTS.length} events</p>
+          <p className="text-[12px] text-[#475569] font-mono mt-0.5">Live Case Timeline · {timelineEvents.length} events</p>
         </div>
         <button className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-[#1e293b] text-[#64748b] rounded hover:text-[#94a3b8] hover:border-[#2d3748] transition-colors">
           <Download size={12} /> Export Timeline

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { NETWORK_NODES, NETWORK_EDGES, PERSONS, Person } from '../data/suspects';
+import { PERSONS } from '../data/suspects';
 import { X } from 'lucide-react';
+import { getCaseGraph, type CaseGraphResponse } from '../services/api';
 
 const NODE_COLORS: Record<string, { fill: string; stroke: string; text: string }> = {
   suspect: { fill: '#ef444420', stroke: '#ef4444', text: '#ef4444' },
@@ -20,8 +21,25 @@ const ROLE_COLOR: Record<string, string> = {
 
 export default function SuspectNetwork() {
   const [selected, setSelected] = useState<string | null>(null);
+  const [graph, setGraph] = useState<CaseGraphResponse | null>(null);
+  const [loading, setLoading] = useState(true);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dims, setDims] = useState({ w: 700, h: 400 });
+
+  useEffect(() => {
+    const loadGraph = async () => {
+      try {
+        const data = await getCaseGraph('FIR-2026-DD590181');
+        setGraph(data);
+      } catch (error) {
+        console.error('Failed to load case graph:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGraph();
+  }, []);
 
   useEffect(() => {
     const update = () => {
@@ -38,16 +56,40 @@ export default function SuspectNetwork() {
   const scaleX = dims.w / 700;
   const scaleY = dims.h / 440;
 
-  const getNode = (id: string) => NETWORK_NODES.find((n) => n.id === id);
+  const getNode = (id: string) => {
+    const node = graph?.nodes.find((n) => n.id === id);
+    if (!node) return undefined;
+
+    const index = graph?.nodes.indexOf(node) ?? 0;
+    const count = graph?.nodes.length ?? 1;
+
+    return {
+      ...node,
+      type:
+        node.type === 'victim'
+          ? 'victim'
+          : node.type === 'suspect'
+            ? 'suspect'
+            : node.type === 'witness'
+              ? 'witness'
+              : node.type === 'location'
+                ? 'location'
+                : 'associate',
+      x: 120 + (index / Math.max(count - 1, 1)) * 460,
+      y: index % 2 === 0 ? 180 : 300,
+    };
+  };
   const person = selected ? PERSONS.find((p) => p.id === selected) : null;
 
   const selectedNode = selected ? getNode(selected) : null;
+  const nodes = graph?.nodes ?? [];
+  const links = graph?.links ?? [];
 
   return (
     <div className="p-5 space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-white">Suspect Relationship Network</h1>
-        <p className="text-[12px] text-[#475569] font-mono mt-0.5">CR-2026-0142 · Click any node to view details</p>
+        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{loading ? "Loading graph..." : `${graph?.case_id ?? "No case"} · Click any node to view details`}</p>
       </div>
 
       {/* Legend */}
@@ -71,7 +113,7 @@ export default function SuspectNetwork() {
             </defs>
 
             {/* Edges */}
-            {NETWORK_EDGES.map((edge, i) => {
+            {links.map((edge, i) => {
               const src = getNode(edge.source);
               const tgt = getNode(edge.target);
               if (!src || !tgt) return null;
@@ -90,7 +132,10 @@ export default function SuspectNetwork() {
             })}
 
             {/* Nodes */}
-            {NETWORK_NODES.map((node) => {
+            {nodes.map((rawNode) => {
+              const node = getNode(rawNode.id);
+              if (!node) return null;
+
               const colors = NODE_COLORS[node.type] ?? NODE_COLORS.associate;
               const nx = node.x * scaleX;
               const ny = node.y * scaleY;

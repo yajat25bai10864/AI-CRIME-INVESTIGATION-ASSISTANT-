@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { EVIDENCE_LIST, Evidence, EvidenceCategory } from '../data/evidence';
+import { getCaseEvidence } from '../services/api';
 
 const CATEGORIES: (EvidenceCategory | 'ALL')[] = ['ALL', 'CCTV', 'Audio', 'Document', 'Image', 'Digital'];
 
@@ -22,8 +23,25 @@ export default function EvidenceManagement() {
   const [category, setCategory] = useState<EvidenceCategory | 'ALL'>('ALL');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Evidence | null>(null);
+  const [evidence, setEvidence] = useState<Evidence[]>(EVIDENCE_LIST);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = EVIDENCE_LIST.filter((e) => {
+  useEffect(() => {
+    const loadEvidence = async () => {
+      try {
+        const data = await getCaseEvidence('FIR-2026-DD590181');
+        setEvidence(data);
+      } catch (error) {
+        console.error('Failed to load evidence:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadEvidence();
+  }, []);
+
+  const filtered = evidence.filter((e) => {
     const matchCat = category === 'ALL' || e.category === category;
     const matchSearch = search === '' ||
       e.id.toLowerCase().includes(search.toLowerCase()) ||
@@ -36,7 +54,7 @@ export default function EvidenceManagement() {
     <div className="p-5 space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-white">Evidence Management</h1>
-        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{EVIDENCE_LIST.length} items in repository · CR-2026-0142</p>
+        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{evidence.length} items in repository · CR-2026-0142</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">

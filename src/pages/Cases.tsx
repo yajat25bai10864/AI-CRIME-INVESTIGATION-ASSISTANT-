@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Search, Filter, ArrowRight } from 'lucide-react';
-import { CASES, CaseStatus, CasePriority } from '../data/cases';
+import { CASES, CaseStatus, CasePriority, type Case } from '../data/cases';
+import { listFIRs } from '../services/api';
 
 const STATUS_FILTERS = ['ALL', 'ACTIVE', 'UNDER_REVIEW', 'CLOSED', 'PENDING', 'HIGH'] as const;
 type Filter = typeof STATUS_FILTERS[number];
@@ -22,8 +23,50 @@ const STATUS_COLOR: Record<string, string> = {
 export default function Cases() {
   const [filter, setFilter] = useState<Filter>('ALL');
   const [search, setSearch] = useState('');
+  const [cases, setCases] = useState<Case[]>(CASES);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = CASES.filter((c) => {
+  useEffect(() => {
+    const loadCases = async () => {
+      try {
+        const firs = await listFIRs();
+
+        const mappedCases: Case[] = firs.map((fir) => ({
+          id: fir.case_id,
+          crimeType: fir.crime_type,
+          location: fir.location.address ?? 'Unknown',
+          date: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleDateString('en-GB')
+            : 'Unknown',
+          time: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : 'Unknown',
+          priority: 'MEDIUM',
+          status: 'ACTIVE',
+          officer: 'AI Investigation System',
+          ipcSections: fir.ipc_sections,
+          summary: fir.raw_text,
+          victim: fir.victim_details[0]?.name ?? 'Unknown',
+          fir: fir.raw_text,
+          evidenceCount: 0,
+          suspectsCount: fir.suspect_details.length,
+        }));
+
+        setCases(mappedCases);
+      } catch (error) {
+        console.error('Failed to load cases:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCases();
+  }, []);
+
+  const filtered = cases.filter((c) => {
     const matchFilter =
       filter === 'ALL' ? true :
       filter === 'HIGH' ? c.priority === 'HIGH' :
@@ -41,7 +84,7 @@ export default function Cases() {
     <div className="p-5 space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-white">Case Registry</h1>
-        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{CASES.length} total cases · MP Nagar Police Station</p>
+        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{cases.length} total cases · MP Nagar Police Station</p>
       </div>
 
       {/* Filters */}
@@ -75,7 +118,9 @@ export default function Cases() {
       </div>
 
       {/* Case count */}
-      <div className="text-[11px] text-[#475569] font-mono">{filtered.length} case{filtered.length !== 1 ? 's' : ''} found</div>
+      <div className="text-[11px] text-[#475569] font-mono">
+        {loading ? 'Loading cases...' : `${filtered.length} case${filtered.length !== 1 ? 's' : ''} found`}
+      </div>
 
       {/* Table */}
       <div className="bg-[#161b26] border border-[#1e293b] rounded overflow-hidden">

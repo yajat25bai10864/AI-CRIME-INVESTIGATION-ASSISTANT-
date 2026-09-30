@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, CheckCircle2, AlertCircle, Edit2, X } from 'lucide-react';
-
+import { analyzeFIRText, analyzeFIRFile } from '../services/api';
 const SCAN_STEPS = [
   'Reading document...',
   'Extracting entities...',
@@ -55,53 +55,146 @@ export default function FIRAnalyzer() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const runScan = () => {
+  const runScan = async (text: string) => {
     setScanning(true);
     setScanStep(0);
     setResult(null);
+
     let step = 0;
+
     const interval = setInterval(() => {
       step++;
       setScanStep(step);
+
       if (step >= SCAN_STEPS.length - 1) {
         clearInterval(interval);
-        setTimeout(() => {
-          setScanning(false);
-          setResult(SAMPLE_FIRS[0].result);
-        }, 500);
       }
-    }, 800);
+    }, 500);
+
+    try {
+      const response = await analyzeFIRText(text);
+
+      clearInterval(interval);
+
+      setTimeout(() => {
+        setScanning(false);
+
+        const fir = response.fir;
+
+        setResult({
+          crimeType: fir.crime_type,
+          victim: fir.victim_details[0]?.name ?? 'Unknown',
+          location: fir.location.address ?? 'Unknown',
+          date: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+              })
+            : 'Unknown',
+          time: fir.incident_date
+            ? new Date(fir.incident_date).toLocaleTimeString('en-GB', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }) + ' hrs'
+            : 'Unknown',
+          ipcSections: fir.ipc_sections,
+          suspectStatus:
+            response.suspect_ids.length > 0
+              ? `${response.suspect_ids.length} suspects identified`
+              : 'No suspects identified',
+          keywords: fir.keywords,
+          confidence: 100,
+          summary: `AI analysis completed for case ${fir.case_id}. ${fir.suspect_details.length} suspect(s) extracted.`,
+        });
+      }, 500);
+    } catch (error) {
+      clearInterval(interval);
+      setScanning(false);
+      console.error('FIR analysis failed:', error);
+      alert('FIR analysis failed. Check the backend terminal for details.');
+    }
   };
 
-  const loadSample = (sample: typeof SAMPLE_FIRS[0]) => {
+  const loadSample = async (sample: typeof SAMPLE_FIRS[0]) => {
     setFile(new File([], sample.label + '.pdf'));
+
+    const sampleText =
+      sample.id === 'sample-1'
+        ? 'On 8 September 2026 at around 8:45 PM, a robbery took place at Central Market, MP Nagar, Bhopal. The victim Suresh Kumar Gupta, aged 52, reported that two unknown men arrived on a black motorcycle and robbed him of cash and a gold chain. The suspects fled towards Kolar Road. The incident was reported at MP Nagar Police Station. The suspects were wearing dark clothes and helmets.'
+        : 'On 2 September 2026 at around 9:15 AM, a theft took place at Habibganj Railway Station, Platform 3. The victim Ramesh Tiwari reported that his wallet and mobile phone were stolen. A suspect was partially identified from station CCTV.';
+
+    await runScan(sampleText);
+  };
+
+  const handleFileUpload = async (f: File) => {
+    setFile(f);
     setScanning(true);
     setScanStep(0);
     setResult(null);
+
     let step = 0;
     const interval = setInterval(() => {
       step++;
       setScanStep(step);
       if (step >= SCAN_STEPS.length - 1) {
         clearInterval(interval);
-        setTimeout(() => {
-          setScanning(false);
-          setResult(sample.result);
-        }, 400);
       }
-    }, 700);
+    }, 500);
+
+    try {
+      const response = await analyzeFIRFile(f);
+
+      clearInterval(interval);
+
+      setScanning(false);
+
+      const fir = response.fir;
+
+      setResult({
+        crimeType: fir.crime_type,
+        victim: fir.victim_details[0]?.name ?? 'Unknown',
+        location: fir.location.address ?? 'Unknown',
+        date: fir.incident_date
+          ? new Date(fir.incident_date).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric',
+            })
+          : 'Unknown',
+        time: fir.incident_date
+          ? new Date(fir.incident_date).toLocaleTimeString('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }) + ' hrs'
+          : 'Unknown',
+        ipcSections: fir.ipc_sections,
+        suspectStatus:
+          response.suspect_ids.length > 0
+            ? `${response.suspect_ids.length} suspects identified`
+            : 'No suspects identified',
+        keywords: fir.keywords,
+        confidence: 100,
+        summary: `AI analysis completed for case ${fir.case_id}. ${fir.suspect_details.length} suspect(s) extracted.`,
+      });
+    } catch (error) {
+      clearInterval(interval);
+      setScanning(false);
+      console.error('FIR file analysis failed:', error);
+      alert('FIR file analysis failed. Make sure the file is a text-based PDF.');
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f) { setFile(f); runScan(); }
+    if (f) handleFileUpload(f);
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { setFile(f); runScan(); }
+    if (f) handleFileUpload(f);
   };
 
   return (

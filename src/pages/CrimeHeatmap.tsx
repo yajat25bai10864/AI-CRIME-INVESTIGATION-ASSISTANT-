@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { CRIME_LOCATIONS, BHOPAL_CENTER } from '../data/crimeLocations';
+import { BHOPAL_CENTER } from '../data/crimeLocations';
+import { getCrimeHeatmap, type CrimeHeatmapPoint } from '../services/api';
 import 'leaflet/dist/leaflet.css';
 
 // Fix leaflet default icon
@@ -40,22 +41,44 @@ function DarkTiles() {
 export default function CrimeHeatmap() {
   const [crimeTypeFilter, setCrimeTypeFilter] = useState('ALL');
   const [selected, setSelected] = useState<string | null>(null);
+  const [heatmapPoints, setHeatmapPoints] = useState<CrimeHeatmapPoint[]>([]);
+  const [totalIncidents, setTotalIncidents] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = CRIME_LOCATIONS.filter((loc) =>
-    crimeTypeFilter === 'ALL' || loc.crimeType === crimeTypeFilter
-  );
+  useEffect(() => {
+    const loadHeatmap = async () => {
+      try {
+        const data = await getCrimeHeatmap();
+        setHeatmapPoints(data.points);
+        setTotalIncidents(data.total_incidents);
+      } catch (error) {
+        console.error('Failed to load crime heatmap:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHeatmap();
+  }, []);
+
+  const filtered = heatmapPoints.filter((point) => {
+    if (crimeTypeFilter === 'ALL') return true;
+    return Object.keys(point.crime_types).some(
+      (crimeType) => crimeType.toLowerCase() === crimeTypeFilter.toLowerCase()
+    );
+  });
 
   const stats = {
-    high: CRIME_LOCATIONS.filter((l) => l.severity === 'HIGH').length,
-    medium: CRIME_LOCATIONS.filter((l) => l.severity === 'MEDIUM').length,
-    low: CRIME_LOCATIONS.filter((l) => l.severity === 'LOW').length,
+    high: 0,
+    medium: 0,
+    low: 0,
   };
 
   return (
     <div className="p-5 space-y-4">
       <div>
         <h1 className="text-lg font-semibold text-white">Crime Heatmap — Bhopal</h1>
-        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{CRIME_LOCATIONS.length} incidents · MP Nagar Police Station jurisdiction</p>
+        <p className="text-[12px] text-[#475569] font-mono mt-0.5">{totalIncidents} incidents · MP Nagar Police Station jurisdiction</p>
       </div>
 
       {/* Stats */}
@@ -105,27 +128,42 @@ export default function CrimeHeatmap() {
           >
             <DarkTiles />
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
             />
-            {filtered.map((loc) => (
-              <Marker
-                key={loc.id}
-                position={[loc.lat, loc.lng]}
-                icon={createMarkerIcon(SEVERITY_COLOR[loc.severity])}
-                eventHandlers={{ click: () => setSelected(loc.id) }}
-              >
-                <Popup className="crime-popup">
-                  <div className="bg-[#161b26] text-[#cbd5e1] p-2 rounded text-[11px] min-w-[200px]">
-                    <div className="font-semibold text-white">{loc.title}</div>
-                    <div className="text-[#64748b] mt-0.5">{loc.area}</div>
-                    <div className="mt-1 font-mono text-[#7c3aed] text-[10px]">{loc.caseId}</div>
-                    <div className="mt-0.5 text-[#f59e0b] text-[10px]">{loc.crimeType}</div>
-                    <div className="mt-0.5 text-[#475569]">{loc.date} · {loc.status}</div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            {filtered.map((point, index) => {
+              const crimeType = Object.keys(point.crime_types)[0] ?? 'Unknown';
+              const markerId = `${point.latitude}-${point.longitude}-${index}`;
+
+              return (
+                <Marker
+                  key={markerId}
+                  position={[point.latitude, point.longitude]}
+                  icon={createMarkerIcon('#ef4444')}
+                  eventHandlers={{ click: () => setSelected(markerId) }}
+                >
+                  <Popup className="crime-popup">
+                    <div className="bg-[#161b26] text-[#cbd5e1] p-2 rounded text-[11px] min-w-[200px]">
+                      <div className="font-semibold text-white">
+                        Crime Incident
+                      </div>
+                      <div className="text-[#64748b] mt-0.5">
+                        Bhopal
+                      </div>
+                      <div className="mt-1 font-mono text-[#7c3aed] text-[10px]">
+                        {point.incident_count} incident{point.incident_count !== 1 ? 's' : ''}
+                      </div>
+                      <div className="mt-0.5 text-[#f59e0b] text-[10px]">
+                        {crimeType}
+                      </div>
+                      <div className="mt-0.5 text-[#475569]">
+                        {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
           </MapContainer>
         </div>
 
@@ -133,27 +171,45 @@ export default function CrimeHeatmap() {
         <div className="bg-[#161b26] border border-[#1e293b] rounded p-3 overflow-y-auto" style={{ maxHeight: 420 }}>
           <div className="text-[11px] text-[#475569] uppercase tracking-wider mb-3">Incidents ({filtered.length})</div>
           <div className="space-y-2">
-            {filtered.map((loc) => (
-              <button
-                key={loc.id}
-                onClick={() => setSelected(selected === loc.id ? null : loc.id)}
-                className={`w-full text-left px-2.5 py-2 rounded border transition-colors ${
-                  selected === loc.id
-                    ? 'border-[#7c3aed] bg-[#1a1033]'
-                    : 'border-[#1e293b] hover:border-[#2d3748]'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-0.5">
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: SEVERITY_COLOR[loc.severity] }} />
-                  <span className="text-[11px] font-medium text-[#cbd5e1] truncate">{loc.title}</span>
-                </div>
-                <div className="flex gap-2 text-[10px] font-mono ml-4">
-                  <span className="text-[#7c3aed]">{loc.caseId}</span>
-                  <span className="text-[#475569]">{loc.date}</span>
-                </div>
-                <div className="text-[10px] text-[#334155] ml-4">{loc.area} · {loc.crimeType}</div>
-              </button>
-            ))}
+            {filtered.map((point, index) => {
+              const crimeType = Object.keys(point.crime_types)[0] ?? 'Unknown';
+              const markerId = `${point.latitude}-${point.longitude}-${index}`;
+
+              return (
+                <button
+                  key={markerId}
+                  onClick={() => setSelected(selected === markerId ? null : markerId)}
+                  className={`w-full text-left px-2.5 py-2 rounded border transition-colors ${
+                    selected === markerId
+                      ? 'border-[#7c3aed] bg-[#1a1033]'
+                      : 'border-[#1e293b] hover:border-[#2d3748]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: '#ef4444' }}
+                    />
+                    <span className="text-[11px] font-medium text-[#cbd5e1] truncate">
+                      {crimeType}
+                    </span>
+                  </div>
+
+                  <div className="flex gap-2 text-[10px] font-mono ml-4">
+                    <span className="text-[#7c3aed]">
+                      {point.incident_count} incident{point.incident_count !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-[#475569]">
+                      Weight {point.weight.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="text-[10px] text-[#334155] ml-4">
+                    {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
