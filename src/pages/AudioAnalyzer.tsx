@@ -16,6 +16,9 @@ const ENTITY_TYPE_COLOR: Record<string, string> = {
 
 export default function AudioAnalyzer() {
   const [playing, setPlaying] = useState(false);
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [progress, setProgress] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcribeStep, setTranscribeStep] = useState(0);
@@ -24,18 +27,34 @@ export default function AudioAnalyzer() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (playing) {
-      timerRef.current = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 100) { setPlaying(false); return 100; }
-          return p + 0.5;
-        });
-      }, 100);
-    } else {
+    return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
+  const handleAudioUpload = (file: File) => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+
+    const url = URL.createObjectURL(file);
+    setAudioFile(file);
+    setAudioUrl(url);
+    setProgress(0);
+    setPlaying(false);
+    setTranscribeDone(false);
+  };
+
+  const toggleAudio = async () => {
+    if (!audioRef.current || !audioUrl) return;
+
+    if (audioRef.current.paused) {
+      await audioRef.current.play();
+      setPlaying(true);
+    } else {
+      audioRef.current.pause();
+      setPlaying(false);
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [playing]);
+  };
 
   const runTranscribe = () => {
     setTranscribing(true);
@@ -83,6 +102,49 @@ export default function AudioAnalyzer() {
               </div>
             </div>
 
+            {/* Real audio upload */}
+            <div className="mb-4 flex items-center gap-3">
+              <label className="px-3 py-2 rounded border border-[#334155] bg-[#0d1117] text-[11px] text-[#94a3b8] cursor-pointer hover:border-[#7c3aed] hover:text-white">
+                {audioFile ? 'Change Audio' : 'Upload Audio'}
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleAudioUpload(file);
+                  }}
+                />
+              </label>
+
+              {audioFile && (
+                <span className="text-[10px] text-[#64748b] font-mono truncate">
+                  {audioFile.name}
+                </span>
+              )}
+
+              {audioUrl && (
+                <audio
+                  ref={audioRef}
+                  src={audioUrl}
+                  preload="metadata"
+                  className="hidden"
+                  onTimeUpdate={(e) => {
+                    const audio = e.currentTarget;
+                    if (audio.duration) {
+                      setProgress((audio.currentTime / audio.duration) * 100);
+                    }
+                  }}
+                  onPlay={() => setPlaying(true)}
+                  onPause={() => setPlaying(false)}
+                  onEnded={() => {
+                    setPlaying(false);
+                    setProgress(100);
+                  }}
+                />
+              )}
+            </div>
+
             {/* Waveform */}
             <div className="relative h-16 bg-[#0d1117] rounded border border-[#1e293b] flex items-center px-3 gap-px overflow-hidden mb-4">
               {waveformBars.map((h, i) => {
@@ -125,8 +187,9 @@ export default function AudioAnalyzer() {
               <div className="flex items-center gap-3">
                 <button onClick={() => setProgress(0)} className="text-[#64748b] hover:text-[#94a3b8]"><SkipBack size={15} /></button>
                 <button
-                  onClick={() => setPlaying(!playing)}
-                  className="w-9 h-9 rounded-full bg-[#7c3aed] flex items-center justify-center text-white hover:bg-[#6d28d9] transition-colors"
+                  onClick={toggleAudio}
+                  disabled={!audioUrl}
+                  className="w-9 h-9 rounded-full bg-[#7c3aed] flex items-center justify-center text-white hover:bg-[#6d28d9] transition-colors disabled:opacity-40"
                 >
                   {playing ? <Pause size={14} /> : <Play size={14} />}
                 </button>
